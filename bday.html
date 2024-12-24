@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maze Game with Checkpoints and Mini-Games</title>
+    <style>
+        /*
+        FUCKING HATE CSS BUT TAKING THIS AS A MOTIVATION:
+        "YOU SUCK"
+        read this when you wanna quit
+         */
+
+        /*
+        MISSING: Win container. MARKED: SOLVED
+        UPDATE: The colors they are pathetic. MARKED: SOLVED
+         */
+        body {
+            font-family: Arial, sans-serif;
+            display:  flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f8ff;
+            position: relative;
+        }
+
+        #mazeContainer {
+            position: relative;
+            width: 500px;
+            height: 500px;
+            background-color: #fff;
+            border: 5px solid #000;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: repeat(12, 1fr);
+            gap: 2px;
+        }
+
+        .wall {
+            background-color: #000;
+        }
+
+        .path {
+            background-color: #eaeaea;
+        }
+
+        #player {
+            background-color: darkslategray;
+            border-radius: 50%;
+        }
+
+        #goal {
+            background-color: rebeccapurple;
+            border-radius: 50%;
+        }
+
+        #checkpoint {
+            background-color: darkred;
+            border-radius: 50%;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            color: white;
+        }
+
+        .modal-content {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .modal button {
+            background-color: #ffd700;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .modal button:hover {
+            background-color: #ff5722;
+        }
+
+        #winModal {
+            display: none;
+        }
+
+        #giftContainer {
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="giftContainer" class="modal">
+    <div class="modal-content">
+        <video id="giftVideo" width="400" controls>
+            <source src="birthday.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+</div>
+
+<div id="mazeContainer"></div>
+
+<!--These are the required modals dhrasti, USE THE BOOKMARKED VIDEO TO REWATCH EVERYTHING-->
+<div id="checkpointModal" class="modal">
+    <div class="modal-content">
+        <h2>Checkpoint Reached!</h2>
+        <p>You have reached a checkpoint. Redirecting to the game...</p>
+        <button id="redirectButton">Go to Game</button>
+    </div>
+</div>
+
+<div id="winModal" class="modal">
+    <div class="modal-content">
+        <h2>Congratulations!</h2>
+        <p>You have reached the goal and completed the maze.</p>
+        <button onclick="window.location.href='bday.html'">Go to Next Game</button>
+    </div>
+</div>
+
+<script>
+    const initialMazeLayout = [
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+        [1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+        [1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1],
+        [1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1],
+        [1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+        [1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+        [1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+        [1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+        [1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    ];
+
+
+    let mazeLayout = [...initialMazeLayout];
+    const mazeContainer = document.getElementById("mazeContainer");
+    const player = { x: 1, y: 1 };
+    const goal = { x: 10, y: 10 }; // Set goal position
+
+    let checkpoints = [
+        { x: 4, y: 3, game: "dinosaur.html" },
+        { x: 8, y: 7, game: "simon.html" }
+    ];
+
+    const checkpointModal = document.getElementById("checkpointModal");
+    const redirectButton = document.getElementById("redirectButton");
+    const winModal = document.getElementById("winModal");
+
+    // Helper function to render the maze
+    function renderMaze() {
+        mazeContainer.innerHTML = "";
+        for (let row = 0; row < mazeLayout.length; row++) {
+            for (let col = 0; col < mazeLayout[row].length; col++) {
+                const cell = document.createElement("div");
+                cell.className = mazeLayout[row][col] === 1 ? "wall" : "path";
+                if (player.x === col && player.y === row) cell.id = "player";
+                if (checkpoints.some(cp => cp.x === col && cp.y === row)) cell.id = "checkpoint";
+                if (goal.x === col && goal.y === row) cell.id = "goal";
+                mazeContainer.appendChild(cell);
+            }
+        }
+    }
+
+    //Show the checkpoint on the maze
+    function showCheckpointModal(game) {
+        checkpointModal.style.display = "block";
+        redirectButton.onclick = () => {
+            window.location.href = game; //Redirection
+        };
+    }
+
+    //When you reach the checkpoint, use this to check whether its a checkpoint
+    //ISSUE: Checking every single one and redirecting. Debug using console. MARKED: SOLVED
+    function checkCheckpoint() {
+        const checkpoint = checkpoints.find(cp => cp.x === player.x && cp.y === player.y);
+        if (checkpoint) {
+            sessionStorage.setItem("playerPosition", JSON.stringify(player)); // Save player position
+            showCheckpointModal(checkpoint.game);
+            removeCheckpointFromMaze(checkpoint); // Remove checkpoint after reaching it
+        }
+    }
+
+    //Once the minigame is complete, remove the fucking checkpoint which took 2 days to set up
+    //ISSUE: removed on the screen, but not from backend console. Rewrite this shit or quit. MARKED: SOLVED
+    function removeCheckpointFromMaze(checkpoint) {
+        mazeLayout[checkpoint.y][checkpoint.x] = 0;
+        checkpoints = checkpoints.filter(cp => cp.x !== checkpoint.x || cp.y !== checkpoint.y);
+
+        sessionStorage.setItem("mazeState", JSON.stringify(mazeLayout));
+        sessionStorage.setItem("remainingCheckpoints", JSON.stringify(checkpoints));
+
+
+    }
+
+
+    //Need to move the player.... No funny business and keep x and y proper
+    document.addEventListener("keydown", (e) => {
+        const { x, y } = player;
+        if (e.key === "ArrowUp" && mazeLayout[y - 1][x] === 0) player.y--;
+        if (e.key === "ArrowDown" && mazeLayout[y + 1][x] === 0) player.y++;
+        if (e.key === "ArrowLeft" && mazeLayout[y][x - 1] === 0) player.x--;
+        if (e.key === "ArrowRight" && mazeLayout[y][x + 1] === 0) player.x++;
+        renderMaze();
+        checkCheckpoint();
+        checkGoal(); //HAPPIEST FUNCTION OF THE CODE
+    });
+
+    function checkGoal() {
+        if (player.x === goal.x && player.y === goal.y) {
+            //gift container here
+            winModal.style.display = "none"; // If you want to skip the win modal
+            const giftContainer = document.getElementById("giftContainer");
+            const giftVideo = document.getElementById("giftVideo");
+
+            giftContainer.style.display = "block"; //Show the gift modal in here
+            giftVideo.play();
+
+        }
+    }
+
+
+
+    //when you return from the minigame, be a sigma and return to the same position as before by saving on JSON parse
+    //PATHETIC THING DOESN'T REMEMBER THE SAVED POSITION SINCE CONSOLE IS CLEARED OUT. REDO IT. MARKED: SOLVED
+    window.onload = () => {
+        const savedPosition = sessionStorage.getItem("playerPosition");
+        const savedMaze = sessionStorage.getItem("mazeState");
+        const savedCheckpoints = sessionStorage.getItem("remainingCheckpoints");
+
+        if (savedPosition && savedMaze && savedCheckpoints) {
+            Object.assign(player, JSON.parse(savedPosition));
+            mazeLayout = JSON.parse(savedMaze);
+            checkpoints = JSON.parse(savedCheckpoints);
+
+            renderMaze();
+        }
+    };
+
+    renderMaze(); //Rendering the maze
+</script>
+</body>
+</html>

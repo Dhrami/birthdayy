@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Furina Runner</title>
+    <style>
+        /*
+        FUCKING HATE CSS BUT TAKING THIS AS A MOTIVATION:
+        "YOU SUCK"
+        read this when you wanna quit
+         */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f8ff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        .note {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            font-family: Cambria,serif;
+            color: #5494da;
+            position: fixed;
+            top: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+
+        canvas {
+            border: 2px solid black;
+        }
+
+        #endMessage, #loseMessage {
+            position: absolute;
+            top: 20px;
+            text-align: center;
+            font-size: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        #loseMessage {
+            display: none;
+        }
+
+        #gameVideo, #winVideo {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            width: 15%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="note">
+    <p>You need to reach 20 points to win :)</p>
+</div>
+
+<canvas id="gameCanvas" width="600" height="200"></canvas>
+
+<div id="endMessage" style="display: none;">
+    <p>Congratulations! You reached the required score!</p>
+    <button onclick="finishGame()">Return to Maze</button>
+</div>
+<div id="loseMessage">
+    <p>Game Over! Try Again.</p>
+    <button onclick="restartGame()">Restart</button>
+</div>
+
+<video id="gameVideo" controls autoplay loop>
+    <source src="aranara-confused.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
+
+<video id="winVideo" controls autoplay>
+    <source src="aranara.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
+
+<script>
+    /*
+    LOVE JAVASCRIPT (ps: javascript doesn't love you)
+    SPEND TIME ON SOMETHING OTHER THAN THIS
+     */
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const dinoImage = new Image();
+    dinoImage.src = 'furina.png';
+
+    const obstacleImage = new Image();
+    obstacleImage.src = 'arlechino.png';
+
+    //ACtions on what the dino character (FURINA) can do
+    let dino = { x: 50, y: 150, width: 50, height: 50, dy: 0, jump: -20 };
+    let gravity = 1.6;
+    let isJumping = false;
+    let obstacles = [];
+    let frame = 0;
+    let score = 0;
+    const winningScore = 20;
+    let obstacleSpeed = 7;
+    let animation;
+    let gameOver = false;
+
+    //You need to show this on the screen dumbass
+    function drawDino() {
+        ctx.drawImage(dinoImage, dino.x, dino.y, dino.width, dino.height);
+    }
+
+    //FATHER IS HERE, change the obstacles size ad random wiht 30 as minimum
+    function createObstacle() {
+        if (frame % 80 === 0) {
+            const width = Math.random() * 30 + 30;
+            const height = Math.random() * 30 + 30;
+            obstacles.push({ x: canvas.width, y: canvas.height - height, width, height });
+        }
+    }
+
+    //Actually show the obstacles on the screen
+    function drawObstacles() {
+        obstacles.forEach((obstacle, index) => {
+            ctx.drawImage(obstacleImage, obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            obstacle.x -= obstacleSpeed;
+            if (obstacle.x + obstacle.width < 0) {
+                obstacles.splice(index, 1);
+                score++;
+            }
+        });
+    }
+
+    //When furina finds arlechino, game ends
+    function detectCollision() {
+        for (let obstacle of obstacles) {
+            if (
+                dino.x < obstacle.x + obstacle.width &&
+                dino.x + dino.width > obstacle.x &&
+                dino.y < obstacle.y + obstacle.height &&
+                dino.y + dino.height > obstacle.y
+            ) {
+                dino.dy = 0;
+                gameOver = true;
+                cancelAnimationFrame(animation);
+                document.getElementById("loseMessage").style.display = "block";
+                document.getElementById("gameVideo").style.display = "block";
+                document.getElementById("gameVideo").play();
+                return;
+            }
+        }
+    }
+
+    //When collision is detected, game should end
+    function update() {
+        if (gameOver) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawDino();
+        createObstacle();
+        drawObstacles();
+
+        dino.y += dino.dy;
+        dino.dy += gravity;
+
+        if (dino.y + dino.height > canvas.height) {
+            dino.y = canvas.height - dino.height;
+            isJumping = false;
+        }
+
+        detectCollision();
+
+        ctx.fillStyle = "black";
+        ctx.font = "20px Arial";
+        ctx.fillText("Score: " + score, 10, 20);
+
+        if (score > 0 && score % 10 === 0) {
+            obstacleSpeed += 0.01;
+        }
+
+        //Game doesnt end despite winning it. MARKED: SOLVED
+        if (score >= winningScore) {
+            document.getElementById("endMessage").style.display = "block";
+            document.getElementById("winVideo").style.display = "block";
+            document.getElementById("winVideo").play();
+            document.getElementById("winVideo").addEventListener("ended", () => {
+                finishGame();
+            });
+            cancelAnimationFrame(animation);
+            return;
+        }
+
+        frame++;
+        animation = requestAnimationFrame(update);
+    }
+
+    document.addEventListener("keydown", (e) => {
+        if (e.code === "Space" && !isJumping && !gameOver) {
+            dino.dy = dino.jump;
+            isJumping = true;
+        }
+    });
+
+    //Restart the game when collided
+    function restartGame() {
+        document.getElementById("loseMessage").style.display = "none";
+        document.getElementById("gameVideo").style.display = "none";
+        document.getElementById("gameVideo").pause();
+        document.getElementById("gameVideo").currentTime = 0;
+        document.getElementById("winVideo").style.display = "none";
+        document.getElementById("winVideo").pause();
+        document.getElementById("winVideo").currentTime = 0;
+        dino.y = 150;
+        dino.dy = 0;
+        isJumping = false;
+        obstacles = [];
+        frame = 0;
+        score = 0;
+        obstacleSpeed = 7;
+        gameOver = false;
+        animation = requestAnimationFrame(update);
+    }
+
+    //Return back to the maze
+    function finishGame() {
+        window.location.href = "bday.html";
+    }
+
+    animation = requestAnimationFrame(update);
+</script>
+</body>
+</html>
